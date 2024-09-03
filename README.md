@@ -24,7 +24,7 @@ Datasets are available in `/datasets`.
 
 ## 3. Experiments:
 
-- Degradation estimation:
+- Degradation estimation on real data:
 ```shell
 cd NUD/
 python main_deg.py 
