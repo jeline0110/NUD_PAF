@@ -17,8 +17,8 @@ This is an official implementation of **Building Non-uniform Degradation Model f
 
 Datasets are available in `/datasets`.
 ```shell
-hypsen.mat (Real dataset captured in practical scenarios.)
-paviaU.mat (Auxiliary dataset used in simulation experiments.)
+-- hypsen.mat (Real dataset captured in practical scenarios.)
+-- paviaU.mat (Auxiliary dataset used in simulation experiments.)
 
 ```
 
