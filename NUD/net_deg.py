@@ -48,10 +48,8 @@ class Spectral_Degradation(nn.Module):
         self.spe_modulate = Spectral_Modulate(C, pos_dim)
         self.new_bands = c
        
-    def forward(self, x, pos=None):
+    def forward(self, x, pos):
         n, bands, h, w = x.shape
-        if pos is None:
-            pos = get_pos_matrix((h, w)).cuda()
         x = self.spe_modulate(x, pos)
         x_speD = torch.zeros((n, self.new_bands, h, w)).cuda()
         for i in range(self.new_bands):
@@ -84,9 +82,13 @@ class Spatial_Warp(nn.Module):
             warp_map = warp_map[..., [1, 0]]
             torch.save(warp_map.detach(), '../results/deg/%s/warp_map.pt' % self.file)
         elif mode == 'test':
-            warp_map = warp_map.permute(0, 3, 1, 2)
-            tool = nn.AdaptiveAvgPool2d((x.shape[2:]))
-            warp_map = tool(warp_map).permute(0, 2, 3, 1)
+            if warp_map.shape[1] % x.shape[2] == 0:
+                scale = warp_map.shape[1] // x.shape[2]
+                warp_map = warp_map[:, ::scale, ::scale, :]
+            else:
+                warp_map = warp_map.permute(0, 3, 1, 2)
+                tool = nn.AdaptiveAvgPool2d((x.shape[2:]))
+                warp_map = tool(warp_map).permute(0, 2, 3, 1)
 
         x_warp = F.grid_sample(x, warp_map, mode='bilinear', padding_mode='border', align_corners=True) # nearest bilinear reflection
         out = torch.clamp(x_warp, 0.0, 1.0)
@@ -114,13 +116,14 @@ class Spatial_Degradation(nn.Module):
         return out
 
 class NUD(nn.Module):
-    def __init__(self, C, c, scale, file='', pos_dim=32, m_ksize=25):
+    def __init__(self, C, c, scale, pos=None, file='', pos_dim=32, m_ksize=25):
         super().__init__()
         self.SpeD = Spectral_Degradation(C, c, pos_dim=pos_dim)
         self.SpaD = Spatial_Degradation(scale, c, file=file, m_ksize=m_ksize)
+        self.pos = pos
 
     def forward(self, lrhsi, hrmsi):
-        lrhsi_sped = self.SpeD(lrhsi)
+        lrhsi_sped = self.SpeD(lrhsi, self.pos)
         hrmsi_spad = self.SpaD(hrmsi)
 
         return lrhsi_sped, hrmsi_spad

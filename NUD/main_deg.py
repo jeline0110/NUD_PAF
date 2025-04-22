@@ -19,7 +19,11 @@ class Estimate():
         C, h, w = self.dataset.lrhsi.shape[1:]
         c, H, W = self.dataset.hrmsi.shape[1:]
         scale = H // h
-        self.est_model = NUD(C, c, scale, file=file, pos_dim=32, m_ksize=25).cuda()
+        # This approach ensures that coordinate information remains consistent for the same 
+        # absolute locations across different resolutions, thus avoiding resolution gaps. 
+        pos_matrix_hr = get_pos_matrix((H, W)).cuda()
+        pos_matrix_lr = pos_matrix_hr[:, :, ::scale, ::scale]
+        self.est_model = NUD(C, c, scale, pos=pos_matrix_lr, file=file, pos_dim=32, m_ksize=25).cuda()
         # mkidr
         self.save_dir = os.path.join('../results/deg/', file)
         if not os.path.exists(self.save_dir):
@@ -33,7 +37,7 @@ class Estimate():
 
     def run(self):
         print('-------------------')
-        print('Start Estimate')
+        print('Start Estimating !')
         print('-------------------')
         for iter_ in range(self.max_iter):
             self.optimizer.zero_grad()
@@ -41,7 +45,7 @@ class Estimate():
             loss = 1. - self.criterion(lrhsi_sped, hrmsi_spad) 
             loss.backward()
             self.optimizer.step()
-
+            
             if (iter_ + 1) % self.print_per_iter == 0:
                 lr = self.optimizer.param_groups[0]['lr']
                 info1 = 'iter:[%d/%d], loss:%.4f' % (iter_ + 1, self.max_iter, loss)
