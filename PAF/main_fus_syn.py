@@ -13,7 +13,7 @@ import pdb
 seed_torch() 
 
 class Fuse():
-    def __init__(self, ffile='', dfile='', max_iter=20, milestones=[-1, -1]):
+    def __init__(self, ffile='', dfile=''):
         super().__init__()
         print('Fus file:%s, Deg file:%s' % (ffile, dfile))
         print('Fuse LR-HSI and HR-MSI ...')
@@ -35,60 +35,44 @@ class Fuse():
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         # data init
-        self.pos_matrix_lr = get_pos_matrix((h, w)).cuda() 
         self.pos_matrix_hr = get_pos_matrix((H, W)).cuda()
+        self.pos_matrix_lr = self.pos_matrix_hr[:, :, ::scale, ::scale]
         # training init
         self.fus_model = PAF(C, est_model).cuda()
         self.l1 = nn.L1Loss()
         # optim
-        LR = 5e-4
-        self.lrs = [1e-4, 1e-5]
-        self.optimizer = torch.optim.Adam(get_params(self.fus_model), lr=LR)
-        self.max_iter = 120000
-        self.milestones = [40000, -1]
-        self.print_per_iter = 1000
-        self.start_val_iter = 80000
+        self.LR = 5e-4
+        self.optimizer = torch.optim.Adam(get_params(self.fus_model), lr=self.LR)
+        self.max_iter = 30000
+        self.print_per_iter = 100
 
     def run(self):
+        # train
         for iter_ in range(1, self.max_iter + 1):
-            lr_scheduler(self.optimizer, self.lrs, iter_, self.milestones)
-            # lambda_lr_scheduler(self.optimizer, self.LR, iter_, self.max_iter)
             self.optimizer.zero_grad()
             out1, out2, out3 = self.fus_model(lr2hsi=self.lr2hsi, lrmsi=self.lrmsi, \
-                pos=self.pos_matrix_lr, lrhsi=self.lrhsi, hrmsi=self.hrmsi, hrpos=self.pos_matrix_hr, \
+                lrpos=self.pos_matrix_lr, lrhsi=self.lrhsi, hrmsi=self.hrmsi, hrpos=self.pos_matrix_hr, \
                 warp_map=self.warp_map, mode='train')
             loss1 = train_loss(out1, self.lrhsi, self.l1)
             loss2 = train_loss(out2, self.lrhsi, self.l1) * 0.5
-            loss3 = train_loss(out3, self.hrmsi, self.l1) * 0.1
+            loss3 = train_loss(out3, self.hrmsi, self.l1) * 0.5
             loss = loss1 + loss2 + loss3
             loss.backward()
             self.optimizer.step()
-
+            
             if iter_ % self.print_per_iter == 0:
                 lr = get_current_lr(self.optimizer)
                 info = 'iter:[%d/%d], lr:%.6f, loss1:%.7f, loss2:%.7f, loss3:%.7f' \
                     % (iter_, self.max_iter, lr, loss1, loss2, loss3)
                 print(info)
-            # start val
-            if iter_ % self.print_per_iter == 0 and iter_ > self.start_val_iter:
-                self.fus_model.eval()
-                with torch.no_grad():
-                    infer_out, _, _ = self.fus_model(lrhsi=self.lrhsi, hrmsi=self.hrmsi, \
-                        hrpos=self.pos_matrix_hr, mode='test')
-                fusion = np.squeeze(infer_out.detach().cpu().numpy())
-                fusion = np.clip(fusion, 0, 1).transpose(1, 2, 0)
-                psnr = get_psnr_np(fusion, self.HRHSI)
-                info = 'PSNR:%.4f' % psnr
-                print(info)
-                self.fus_model.train()
-
+        # test
         with torch.no_grad():
             infer_out, _, _ = self.fus_model(lrhsi=self.lrhsi, hrmsi=self.hrmsi, \
                 hrpos=self.pos_matrix_hr, mode='test')
 
         fusion = np.squeeze(infer_out.detach().cpu().numpy())
         fusion = np.clip(fusion, 0, 1).transpose(1, 2, 0)
-        print('Get Final Results !!!')
+        print('Get Final Results !')
         info1 = 'PSNR:%.4f' % get_psnr_np(fusion, self.HRHSI)
         print(info1)
         info2 = 'RMSE:%.4f' % get_rmse_np(fusion, self.HRHSI)

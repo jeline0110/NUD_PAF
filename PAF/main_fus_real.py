@@ -8,12 +8,12 @@ import numpy as np
 from net_fus import PAF
 from data_fus import Load_NUD
 from utils import *
-from qnr import qnr_init, qnr
+from qnr import qnr, qnr_init, qnr_fake, qnr_fake_init
 import pdb
 seed_torch() 
 
 class Fuse():
-    def __init__(self, file='', max_iter=20, milestones=[-1, -1]):
+    def __init__(self, file=''):
         super().__init__()
         print('Fus file:%s' % file)
         print('Fuse LR-HSI and HR-MSI ...')
@@ -39,38 +39,38 @@ class Fuse():
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         # data init
-        self.pos_matrix_lr = get_pos_matrix((h, w)).cuda() 
         self.pos_matrix_hr = get_pos_matrix((H, W)).cuda()
+        self.pos_matrix_lr = self.pos_matrix_hr[:, :, ::scale, ::scale]
         self.lrhsi = torch.Tensor(HSI).unsqueeze(0).cuda()
         self.hrmsi = torch.Tensor(MSI).unsqueeze(0).cuda()
         with torch.no_grad():
             self.lr2hsi = self.est_model.SpaD(self.lrhsi, mode='test', warp_map=self.warp_map)
-            self.lrmsi = self.est_model.SpeD(self.lrhsi)
+            self.lrmsi = self.est_model.SpeD(self.lrhsi, self.pos_matrix_lr)
         # qnr init
         pan = self.hrmsi.squeeze(0).cpu().numpy().mean(0)
         self.pan_info, self.Q_lambda_lr, self.Q_s_lr = qnr_init(self.lrhsi, pan, winsize=33, scale=scale)
+        self.hsi_info, self.hsi_info_sband = qnr_fake_init(self.lrhsi)
         # training init
         self.fus_model = PAF(C, self.est_model).cuda()
         self.l1 = nn.L1Loss()
         # optim
         self.LR = 5e-4
-        self.lrs = [1e-4, 1e-5]
         self.optimizer = torch.optim.Adam(get_params(self.fus_model), lr=self.LR)
-        self.max_iter = 135
-        self.milestones = [-1, -1]
-        self.print_per_iter = 5
+        self.max_iter = 30000
+        self.print_per_iter = 100
+        self.val_per_iter = 10
+        self.best_qnr_fake = 0
 
     def run(self):
+        # train
         for iter_ in range(1, self.max_iter + 1):
-            lr_scheduler(self.optimizer, self.lrs, iter_, self.milestones)
-            # lambda_lr_scheduler(self.optimizer, self.LR, iter_, self.max_iter)
             self.optimizer.zero_grad()
             out1, out2, out3 = self.fus_model(lr2hsi=self.lr2hsi, lrmsi=self.lrmsi, \
-                pos=self.pos_matrix_lr, lrhsi=self.lrhsi, hrmsi=self.hrmsi, hrpos=self.pos_matrix_hr, \
+                lrpos=self.pos_matrix_lr, lrhsi=self.lrhsi, hrmsi=self.hrmsi, hrpos=self.pos_matrix_hr, \
                 warp_map=self.warp_map, mode='train')
             loss1 = train_loss(out1, self.lrhsi, self.l1)
             loss2 = train_loss(out2, self.lrhsi, self.l1) * 0.5
-            loss3 = train_loss(out3, self.hrmsi, self.l1) * 0.1
+            loss3 = train_loss(out3, self.hrmsi, self.l1) * 0.5
             loss = loss1 + loss2 + loss3
             loss.backward()
             self.optimizer.step()
@@ -80,24 +80,36 @@ class Fuse():
                 info = 'iter:[%d/%d], lr:%.6f, loss1:%.7f, loss2:%.7f, loss3:%.7f' \
                     % (iter_, self.max_iter, lr, loss1, loss2, loss3)
                 print(info)
+            # start val
+            if iter_ % self.val_per_iter == 0:
+                self.fus_model.eval()
+                with torch.no_grad():
+                    infer_out, _, _ = self.fus_model(lrhsi=self.lrhsi, hrmsi=self.hrmsi, 
+                        hrpos=self.pos_matrix_hr, mode='test')
 
-        with torch.no_grad():
-            infer_out, _, _ = self.fus_model(lrhsi=self.lrhsi, hrmsi=self.hrmsi, 
-                hrpos=self.pos_matrix_hr, mode='test')
-
-        infer_out = torch.clamp(infer_out, 0.0, 1.0)
-        D_lambda, D_s, QNR = qnr(infer_out, self.pan_info, self.Q_lambda_lr, self.Q_s_lr)
+                infer_out = torch.clamp(infer_out, 0.0, 1.0)
+                _, _, QNR_fake = qnr_fake(infer_out, self.hsi_info, self.hsi_info_sband, self.pan_info, self.Q_s_lr)
+                # print('QNR_fake:%.5f' % QNR_fake)
+                if QNR_fake > self.best_qnr_fake:
+                    self.best_qnr_fake = QNR_fake
+                    torch.save(self.fus_model.state_dict(), self.save_dir + '/best.pkl')
+                    fusion = np.squeeze(infer_out.detach().cpu().numpy())
+                    np.save(self.save_dir + '/best_fusion.npy', fusion)
+                self.fus_model.train()
+        # test
+        fusion = np.load(self.save_dir + '/best_fusion.npy')      
+        save_name = self.save_dir + '/fusion.pdf'
+        gen_false_color_img(fusion.transpose(1, 2, 0), save_name, clist=[10, 30, 50])
+        
+        fusion = torch.tensor(fusion, dtype=torch.float32).unsqueeze(0).cuda()
+        D_lambda, D_s, QNR = qnr(fusion, self.pan_info, self.Q_lambda_lr, self.Q_s_lr)
         info = 'Dλ:%.5f, Ds:%.5f, QNR:%.5f' % (D_lambda, D_s, QNR)
         print(info)
         with open(self.save_dir + '/info.txt', 'a') as f:
-            f.write(info)
-        fusion = np.squeeze(infer_out.detach().cpu().numpy()).transpose(1, 2, 0)
-        np.save(self.save_dir + '/fusion.npy', fusion)
-        gen_false_color_img(fusion, self.save_dir + '/fusion.pdf', clist=[10, 30, 50])
-        torch.save(self.fus_model.state_dict(), self.save_dir + '/fus_model.pkl')
+            f.write(info + '\n')
 
 if __name__ == '__main__': 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     file = 'hypsen'
     fuse = Fuse(file=file)
     fuse.run()

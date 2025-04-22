@@ -33,8 +33,11 @@ def Syndata_generator(ffile='paviau', dfile='hypsen'):
     hrhsi = torch.tensor(HRHSI, dtype=torch.float32).unsqueeze(0).permute(0, 3, 1, 2).cuda()
     with torch.no_grad():
         lrhsi = est_model.SpaD(hrhsi, mode='test', warp_map=warp_map)
-        hrmsi = est_model.SpeD(hrhsi)
+        H, W = hrhsi.shape[2:]
+        pos_matrix_hr = get_pos_matrix((H, W)).cuda()
+        hrmsi = est_model.SpeD(hrhsi, pos_matrix_hr)
         lr2hsi = est_model.SpaD(lrhsi, mode='test', warp_map=warp_map)
-        lrmsi = est_model.SpeD(lrhsi)
+        pos_matrix_lr = pos_matrix_hr[:, :, ::scale, ::scale]
+        lrmsi = est_model.SpeD(lrhsi, pos_matrix_lr)
 
     return hrhsi, lrhsi, hrmsi, lr2hsi, lrmsi, est_model, warp_map

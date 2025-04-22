@@ -136,6 +136,16 @@ def get_lambda_operator(img_info, ishr=False):
 
     return Q
 
+def get_lambda_operator_fake(img_info1, img_info2, ishr=False):
+    C = len(img_info1)
+    data = [(img_info1[i], img_info2[0]) for i in range(C)]
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        if ishr: Q = list(executor.map(_qindex_hr, data))
+        else: Q = list(executor.map(_qindex_lr, data))
+    Q = torch.tensor(Q)
+
+    return Q
+
 def D_lambda(Q_hr, Q_lr, p=1):
     """
     Spectral distortion
@@ -217,4 +227,34 @@ def qnr(fus, pan_info, Q_lambda_lr, Q_s_lr, p=1, q=1, alpha=1, beta=1):
 
     return D_lambda_idx, D_s_idx, QNR_idx
 
+def qnr_fake_init(hsi, fake_mode='mean'):
+    hsi_info = info_init(hsi)
+    idx = hsi.shape[1]//2
+    # single-band hsi_info
+    if fake_mode == 'xband':
+        hsi_info_sband = info_init(hsi[:,idx:idx+1,:,:])
+    elif fake_mode == 'mean':
+        hsi_info_sband = info_init(hsi.mean(1).unsqueeze(1))
 
+    return hsi_info, hsi_info_sband
+
+def qnr_fake(fus, hsi_info, hsi_info_sband, pan_info, Q_s_lr, p=1, q=1, alpha=1, beta=1, fake_mode='mean'):
+    '''
+    fus: generated HRHSI
+    '''
+    fus_info = info_init(fus)
+    idx = fus.shape[1] // 2
+    # single-band fus_info
+    if fake_mode == 'xband':
+        fus_info_sband = info_init(fus[:,idx:idx+1,:,:])
+    elif fake_mode == 'mean':
+        fus_info_sband = info_init(fus.mean(1).unsqueeze(1))
+    """QNR - No reference IQA"""
+    Q_lambda_lr = get_lambda_operator_fake(hsi_info, hsi_info_sband, ishr=False)
+    Q_lambda_hr = get_lambda_operator_fake(fus_info, fus_info_sband, ishr=True)
+    Q_s_hr = get_s_operator(fus_info, pan_info, ishr=True)
+    D_lambda_idx = float(D_lambda(Q_lambda_hr, Q_lambda_lr, p))
+    D_s_idx = float(D_s(Q_s_hr, Q_s_lr, q))
+    QNR_idx = float((1 - D_lambda_idx) ** alpha * (1 - D_s_idx) ** beta)
+
+    return D_lambda_idx, D_s_idx, QNR_idx

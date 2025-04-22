@@ -6,10 +6,6 @@ class ConvBlock(nn.Module):
     def __init__(self, ch):
         super().__init__()
         self.block = nn.Sequential(
-            # nn.Conv2d(ch, ch, 3, 1, 1, bias=1, groups=ch),
-            # nn.GELU(),
-            # nn.Conv2d(ch, ch, 3, 1, 1, bias=1, groups=ch),
-            # nn.GELU(),
             nn.Conv2d(ch, ch, 3, 1, 1),
             nn.GELU(),
             nn.Conv2d(ch, ch, 3, 1, 1),
@@ -74,7 +70,7 @@ class PAF(nn.Module):
 
         return lrhsi_hrmsi_cat, lrhsi_ups, hrmsi_upc
 
-    def body(self, hsi, msi, pos=None):
+    def body(self, hsi, msi, pos):
         x_cat, hsi_ups, _ = self.data_up(hsi, msi)
         x = self.head(x_cat)
         x = self.posnet(x, pos)
@@ -83,13 +79,13 @@ class PAF(nn.Module):
 
         return out
 
-    def forward(self, lr2hsi=None, lrmsi=None, pos=None, lrhsi=None, \
+    def forward(self, lr2hsi=None, lrmsi=None, lrpos=None, lrhsi=None, \
             hrmsi=None, hrpos=None, warp_map=None, mode='train'):
         if mode == 'train':
-            out1 = self.body(lr2hsi, lrmsi, pos)
+            out1 = self.body(lr2hsi, lrmsi, lrpos)
             fake = self.body(lrhsi, hrmsi, hrpos)
             out2 = self.est_model.SpaD(fake, mode='test', warp_map=warp_map)
-            out3 = self.est_model.SpeD(fake, pos=hrpos)
+            out3 = self.est_model.SpeD(fake, hrpos)
         else:
             out1 = self.body(lrhsi, hrmsi, hrpos)
             out2, out3 = None, None
