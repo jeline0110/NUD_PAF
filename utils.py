@@ -17,13 +17,19 @@ import pdb
 #-----------------------#
 # seed function
 #-----------------------#
-def seed_torch(seed=0):
+def seed_torch(seed=666):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
     np.random.seed(seed)
+
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+
+    torch.backends.cudnn.deterministic = True # avoiding nondeterministic algorithms
+    torch.backends.cudnn.benchmark = False # select the default convolution algorithm
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8' # control the memory allocation strategy used by cuBLAS
+    # torch.set_deterministic(True) # avoiding nondeterministic algorithms
 
 #-----------------------#
 # other function
@@ -58,7 +64,7 @@ def train_loss(x, gt, func):
         loss = func(x, gt)
 
     return loss
-    
+
 #-----------------------#
 # evaluate function
 #-----------------------#
@@ -208,6 +214,18 @@ def get_pos_matrix(shape):
 
     return pos_matrix
 
+def uniform_downsample(x, target_h, target_w):
+    B = x.shape[0]
+    grid_y = torch.linspace(-1, 1, target_h, device=x.device)
+    grid_x = torch.linspace(-1, 1, target_w, device=x.device)
+    grid_y, grid_x = torch.meshgrid(grid_y, grid_x)
+    grid = torch.stack((grid_x, grid_y), dim=-1)
+    grid = grid.unsqueeze(0).repeat(B, 1, 1, 1)
+
+    x_down = F.grid_sample(x, grid, mode='bilinear', padding_mode='border', align_corners=True)
+    
+    return x_down
+
 def get_grid_map(size):
     h, w = size
     vectors = [torch.arange(0, s) for s in (h, w)]
@@ -240,7 +258,11 @@ def SamePadding(images, ksizes, strides, rates=(1, 1)):
 #-----------------------#
 # lr function
 #-----------------------#
-def lr_scheduler(optimizer, lrs, epoch, milestones):
+def lr_scheduler_1step(optimizer, lrs, epoch, milestones):
+    if milestones[0] < epoch:
+        optimizer.param_groups[0]['lr'] = lrs[0]
+
+def lr_scheduler_2step(optimizer, lrs, epoch, milestones):
     if milestones[0] < epoch <= milestones[1] and milestones[1] != -1:
         optimizer.param_groups[0]['lr'] = lrs[0]
     if milestones[1] < epoch and milestones[1] != -1:
