@@ -71,11 +71,11 @@ class PAF(nn.Module):
         return lrhsi_hrmsi_cat, lrhsi_ups, hrmsi_upc
 
     def body(self, hsi, msi, pos):
-        x_cat, hsi_ups, _ = self.data_up(hsi, msi)
+        x_cat, _, _ = self.data_up(hsi, msi)
         x = self.head(x_cat)
         x = self.posnet(x, pos)
         x = self.convblock(x)
-        out = self.tail(x) # + hsi_ups
+        out = self.tail(x)
 
         return out
 

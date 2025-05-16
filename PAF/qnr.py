@@ -136,6 +136,8 @@ def get_lambda_operator(img_info, ishr=False):
 
     return Q
 
+# Calculating D_lambda is too slow. 
+# To facilitate the selection of the optimal result, certain band or band mean is used as a reference.
 def get_lambda_operator_fake(img_info1, img_info2, ishr=False):
     C = len(img_info1)
     data = [(img_info1[i], img_info2[0]) for i in range(C)]
@@ -188,7 +190,7 @@ def info_init(x):
     
     return info
 
-def qnr_init(hsi, pan, winsize=33, scale=4):
+def qnr_init(hsi, pan, winsize=41, scale=4):
     '''
     hsi: LRHSI
     pan: HRMSI band-mean
@@ -238,6 +240,7 @@ def qnr_fake_init(hsi, fake_mode='mean'):
 
     return hsi_info, hsi_info_sband
 
+# Quick calculation, inaccurate, results for reference only
 def qnr_fake(fus, hsi_info, hsi_info_sband, pan_info, Q_s_lr, p=1, q=1, alpha=1, beta=1, fake_mode='mean'):
     '''
     fus: generated HRHSI

@@ -3,17 +3,18 @@ from utils import *
 import scipy.io as scio
 import torch 
 import numpy as np 
+import pdb
 
 def Load_NUD(deg_info):
     file, C, c, scale = deg_info['name'], deg_info['C'], deg_info['c'], deg_info['scale']
-    est_model = NUD(C, c, scale, pos_dim=32, m_ksize=25).cuda()
-    model_dir = os.path.join('../results/deg/', file)
+    est_model = NUD(C, c, scale, pos_dim=4, m_ksize=25).cuda()
+    model_dir = os.path.join('../results/deg2', file)
     est_model.load_state_dict(torch.load(model_dir + '/est_model.pkl'))
     est_model.eval()
 
     map_path = model_dir + '/warp_map.pt'
     warp_map = torch.load(map_path).cuda() # b, c, h, w
-    print('Deg components load done ...')
+    print('Deg components load done !')
 
     return est_model, warp_map
 
@@ -36,8 +37,10 @@ def Syndata_generator(ffile='paviau', dfile='hypsen'):
         H, W = hrhsi.shape[2:]
         pos_matrix_hr = get_pos_matrix((H, W)).cuda()
         hrmsi = est_model.SpeD(hrhsi, pos_matrix_hr)
+
         lr2hsi = est_model.SpaD(lrhsi, mode='test', warp_map=warp_map)
-        pos_matrix_lr = pos_matrix_hr[:, :, ::scale, ::scale]
+        h, w = lrhsi.shape[2:]
+        pos_matrix_lr = uniform_downsample(pos_matrix_hr, h, w)
         lrmsi = est_model.SpeD(lrhsi, pos_matrix_lr)
 
     return hrhsi, lrhsi, hrmsi, lr2hsi, lrmsi, est_model, warp_map

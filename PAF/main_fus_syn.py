@@ -3,12 +3,10 @@ sys.path.append('..')
 sys.path.append('../NUD/')
 import torch
 import torch.nn as nn
-import scipy.io as scio
 import numpy as np
 from net_fus import PAF
 from data_fus import Syndata_generator
 from utils import *
-from qnr import qnr_init, qnr
 import pdb
 seed_torch() 
 
@@ -36,43 +34,52 @@ class Fuse():
             os.makedirs(self.save_dir)
         # data init
         self.pos_matrix_hr = get_pos_matrix((H, W)).cuda()
-        self.pos_matrix_lr = self.pos_matrix_hr[:, :, ::scale, ::scale]
+        self.pos_matrix_lr = uniform_downsample(self.pos_matrix_hr, h, w)
         # training init
         self.fus_model = PAF(C, est_model).cuda()
         self.l1 = nn.L1Loss()
         # optim
         self.LR = 5e-4
         self.optimizer = torch.optim.Adam(get_params(self.fus_model), lr=self.LR)
-        self.max_iter = 30000
+        self.max_iter = 60000
+        self.lrs = [1e-4]
+        self.milestones= [30000]
         self.print_per_iter = 100
+        self.val_per_iter = 100
 
     def run(self):
         # train
         for iter_ in range(1, self.max_iter + 1):
+            lr_scheduler_1step(self.optimizer, self.lrs, iter_, self.milestones)
             self.optimizer.zero_grad()
             out1, out2, out3 = self.fus_model(lr2hsi=self.lr2hsi, lrmsi=self.lrmsi, \
                 lrpos=self.pos_matrix_lr, lrhsi=self.lrhsi, hrmsi=self.hrmsi, hrpos=self.pos_matrix_hr, \
                 warp_map=self.warp_map, mode='train')
-            loss1 = train_loss(out1, self.lrhsi, self.l1)
+            loss1 = train_loss(out1, self.lrhsi, self.l1) * 1.0
             loss2 = train_loss(out2, self.lrhsi, self.l1) * 0.5
             loss3 = train_loss(out3, self.hrmsi, self.l1) * 0.5
             loss = loss1 + loss2 + loss3
             loss.backward()
             self.optimizer.step()
-            
+            # print info
             if iter_ % self.print_per_iter == 0:
                 lr = get_current_lr(self.optimizer)
                 info = 'iter:[%d/%d], lr:%.6f, loss1:%.7f, loss2:%.7f, loss3:%.7f' \
                     % (iter_, self.max_iter, lr, loss1, loss2, loss3)
                 print(info)
-        # test
-        with torch.no_grad():
-            infer_out, _, _ = self.fus_model(lrhsi=self.lrhsi, hrmsi=self.hrmsi, \
-                hrpos=self.pos_matrix_hr, mode='test')
-
-        fusion = np.squeeze(infer_out.detach().cpu().numpy())
-        fusion = np.clip(fusion, 0, 1).transpose(1, 2, 0)
-        print('Get Final Results !')
+            # start val
+            if iter_ % self.val_per_iter == 0:
+                self.fus_model.eval()              
+                with torch.no_grad():
+                    infer_out, _, _ = self.fus_model(lrhsi=self.lrhsi, hrmsi=self.hrmsi, \
+                        hrpos=self.pos_matrix_hr, mode='test')
+                fusion = np.squeeze(infer_out.detach().cpu().numpy())
+                fusion = np.clip(fusion, 0, 1).transpose(1, 2, 0)
+                psnr = get_psnr_np(fusion, self.HRHSI)
+                info = 'psnr:%.4f' % psnr
+                print(info)
+                self.fus_model.train()  
+        # start test
         info1 = 'PSNR:%.4f' % get_psnr_np(fusion, self.HRHSI)
         print(info1)
         info2 = 'RMSE:%.4f' % get_rmse_np(fusion, self.HRHSI)
@@ -86,15 +93,15 @@ class Fuse():
         info = info1 + '\n' + info2 + '\n' + info3 + '\n' + info4 + '\n' + info5 + '\n'
         with open(self.save_dir + '/info.txt', 'a') as f:
             f.write(info)
-
+        # save results
+        np.save(self.save_dir + '/fusion.npy', fusion)
         error_map = get_error_map(fusion, self.HRHSI, norm=True)
         vis_errormap(error_map, self.save_dir + '/fus_error.pdf', vmax=1.0)
-        np.save(self.save_dir + '/fusion.npy', fusion)
         gen_false_color_img(fusion, self.save_dir + '/fusion.pdf', clist=[10, 30, 50])
         torch.save(self.fus_model.state_dict(), self.save_dir + '/fus_model.pkl')
 
 if __name__ == '__main__': 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     ffile = 'paviau'
     dfile = 'hypsen'
     fuse = Fuse(ffile=ffile, dfile=dfile)

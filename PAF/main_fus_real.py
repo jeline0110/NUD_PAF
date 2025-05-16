@@ -40,7 +40,7 @@ class Fuse():
             os.makedirs(self.save_dir)
         # data init
         self.pos_matrix_hr = get_pos_matrix((H, W)).cuda()
-        self.pos_matrix_lr = self.pos_matrix_hr[:, :, ::scale, ::scale]
+        self.pos_matrix_lr = uniform_downsample(self.pos_matrix_hr, h, w)
         self.lrhsi = torch.Tensor(HSI).unsqueeze(0).cuda()
         self.hrmsi = torch.Tensor(MSI).unsqueeze(0).cuda()
         with torch.no_grad():
@@ -48,7 +48,7 @@ class Fuse():
             self.lrmsi = self.est_model.SpeD(self.lrhsi, self.pos_matrix_lr)
         # qnr init
         pan = self.hrmsi.squeeze(0).cpu().numpy().mean(0)
-        self.pan_info, self.Q_lambda_lr, self.Q_s_lr = qnr_init(self.lrhsi, pan, winsize=33, scale=scale)
+        self.pan_info, self.Q_lambda_lr, self.Q_s_lr = qnr_init(self.lrhsi, pan, scale=scale)
         self.hsi_info, self.hsi_info_sband = qnr_fake_init(self.lrhsi)
         # training init
         self.fus_model = PAF(C, self.est_model).cuda()
@@ -68,13 +68,13 @@ class Fuse():
             out1, out2, out3 = self.fus_model(lr2hsi=self.lr2hsi, lrmsi=self.lrmsi, \
                 lrpos=self.pos_matrix_lr, lrhsi=self.lrhsi, hrmsi=self.hrmsi, hrpos=self.pos_matrix_hr, \
                 warp_map=self.warp_map, mode='train')
-            loss1 = train_loss(out1, self.lrhsi, self.l1)
+            loss1 = train_loss(out1, self.lrhsi, self.l1) * 1.0
             loss2 = train_loss(out2, self.lrhsi, self.l1) * 0.5
             loss3 = train_loss(out3, self.hrmsi, self.l1) * 0.5
             loss = loss1 + loss2 + loss3
             loss.backward()
             self.optimizer.step()
-
+            # print info
             if iter_ % self.print_per_iter == 0:
                 lr = get_current_lr(self.optimizer)
                 info = 'iter:[%d/%d], lr:%.6f, loss1:%.7f, loss2:%.7f, loss3:%.7f' \
@@ -89,7 +89,6 @@ class Fuse():
 
                 infer_out = torch.clamp(infer_out, 0.0, 1.0)
                 _, _, QNR_fake = qnr_fake(infer_out, self.hsi_info, self.hsi_info_sband, self.pan_info, self.Q_s_lr)
-                # print('QNR_fake:%.5f' % QNR_fake)
                 if QNR_fake > self.best_qnr_fake:
                     self.best_qnr_fake = QNR_fake
                     torch.save(self.fus_model.state_dict(), self.save_dir + '/best.pkl')
@@ -100,7 +99,7 @@ class Fuse():
         fusion = np.load(self.save_dir + '/best_fusion.npy')      
         save_name = self.save_dir + '/fusion.pdf'
         gen_false_color_img(fusion.transpose(1, 2, 0), save_name, clist=[10, 30, 50])
-        
+
         fusion = torch.tensor(fusion, dtype=torch.float32).unsqueeze(0).cuda()
         D_lambda, D_s, QNR = qnr(fusion, self.pan_info, self.Q_lambda_lr, self.Q_s_lr)
         info = 'Dλ:%.5f, Ds:%.5f, QNR:%.5f' % (D_lambda, D_s, QNR)
@@ -109,7 +108,7 @@ class Fuse():
             f.write(info + '\n')
 
 if __name__ == '__main__': 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     file = 'hypsen'
     fuse = Fuse(file=file)
     fuse.run()
