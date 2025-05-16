@@ -19,18 +19,16 @@ class Estimate():
         C, h, w = self.dataset.lrhsi.shape[1:]
         c, H, W = self.dataset.hrmsi.shape[1:]
         scale = H // h
-        # This approach ensures that coordinate information remains consistent for the same 
-        # absolute locations across different resolutions, thus avoiding resolution gaps. 
         pos_matrix_hr = get_pos_matrix((H, W)).cuda()
-        pos_matrix_lr = pos_matrix_hr[:, :, ::scale, ::scale]
-        self.est_model = NUD(C, c, scale, pos=pos_matrix_lr, file=file, pos_dim=32, m_ksize=25).cuda()
+        pos_matrix_lr = uniform_downsample(pos_matrix_hr, h, w)
+        self.est_model = NUD(C, c, scale, pos=pos_matrix_lr, file=file, pos_dim=4, m_ksize=25).cuda()
         # mkidr
-        self.save_dir = os.path.join('../results/deg/', file)
+        self.save_dir = os.path.join('../results/deg', file)
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
         # other init
         lr = 5e-4 
-        self.max_iter = 2000
+        self.max_iter = 3500
         self.print_per_iter = 100
         self.criterion = get_ssim_torch
         self.optimizer = torch.optim.Adam(self.est_model.parameters(), lr=lr)
@@ -45,7 +43,7 @@ class Estimate():
             loss = 1. - self.criterion(lrhsi_sped, hrmsi_spad) 
             loss.backward()
             self.optimizer.step()
-            
+            # print info
             if (iter_ + 1) % self.print_per_iter == 0:
                 lr = self.optimizer.param_groups[0]['lr']
                 info1 = 'iter:[%d/%d], loss:%.4f' % (iter_ + 1, self.max_iter, loss)
@@ -60,17 +58,17 @@ class Estimate():
                 with open(self.save_dir + '/info.txt', 'a') as f:
                     f.write(info)
 
-                lrhsi_sped = lrhsi_sped.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-                hrmsi_spad = hrmsi_spad.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
-                gen_false_color_img(lrhsi_sped, self.save_dir + '/lrhsi_sped_%d.pdf' % (iter_ + 1), clist=[0, 1, 2])
-                gen_false_color_img(hrmsi_spad, self.save_dir + '/hrmsi_spad_%d.pdf' % (iter_ + 1), clist=[0, 1, 2])
-
+        lrhsi_sped = lrhsi_sped.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
+        hrmsi_spad = hrmsi_spad.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
+        gen_false_color_img(lrhsi_sped, self.save_dir + '/lrhsi_sped.pdf', clist=[0, 1, 2])
+        gen_false_color_img(hrmsi_spad, self.save_dir + '/hrmsi_spad.pdf', clist=[0, 1, 2])
+        # save results
         torch.save(self.est_model.state_dict(), self.save_dir + '/est_model.pkl')
         error_map = get_error_map(lrhsi_sped, hrmsi_spad, norm=True)
         vis_errormap(error_map, self.save_dir + '/degesti_error.pdf')
 
 if __name__ == '__main__': 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     file = 'hypsen'
     estimate = Estimate(file=file)
     estimate.run()

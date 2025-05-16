@@ -25,7 +25,7 @@ class DownSampling(nn.Module):
             nn.Conv2d(C, C, 3, 2, 1),
             nn.GELU(),
         )
- 
+
     def forward(self, x):
         return self.Down(x)
  
@@ -33,7 +33,7 @@ class UpSampling(nn.Module):
     def __init__(self, C):
         super(UpSampling, self).__init__()
         self.Up = nn.Conv2d(C, C // 2, 1, 1, 0)
- 
+
     def forward(self, x, r):
         up = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=True)
         x = self.Up(up)
@@ -54,7 +54,15 @@ class UNet(nn.Module):
         self.U2 = UpSampling(dim * 2)
         self.C5 = Conv(dim * 2, dim)
         self.out = nn.Conv2d(dim, C_out, 3, 1, 1)
+        self.apply(self._initialize_weights)
 
+    def _initialize_weights(self, m):
+        for name, layer in self.named_modules():
+            if isinstance(layer, nn.Conv2d):
+                nn.init.kaiming_uniform_(layer.weight, mode='fan_out', nonlinearity='relu')
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias, 0)
+  
     def forward(self, x):
         L1 = self.C1(x)
         L2 = self.C2(self.D1(L1))

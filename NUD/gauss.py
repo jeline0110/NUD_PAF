@@ -14,7 +14,7 @@ class GaussKernel(nn.Module):
 
         sigma_x = torch.ones([1], dtype=torch.float32) * init_paras[1]
         if 'sigma_x' in fix_list:
-            self.sigma_x = self.sigma_x
+            self.sigma_x = self.sigma_y
         else:
             self.sigma_x = nn.Parameter(sigma_x)
 

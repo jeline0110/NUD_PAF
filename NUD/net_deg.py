@@ -7,7 +7,7 @@ from utils import *
 import pdb 
 
 class Spectral_Modulate(nn.Module):
-    def __init__(self, C, pos_dim=16):        
+    def __init__(self, C, pos_dim=4):        
         super().__init__()
         self.pos_emb = nn.Sequential(
             nn.Conv2d(2, pos_dim, 1, 1, 0, bias=False),
@@ -15,9 +15,9 @@ class Spectral_Modulate(nn.Module):
             )
 
         self.modulate = nn.Sequential(
-            nn.Conv2d(C + pos_dim, 64, 1, 1, 0, bias=False),
+            nn.Conv2d(C + pos_dim, 32, 1, 1, 0, bias=False),
             nn.GELU(),
-            nn.Conv2d(64, C, 1, 1, 0, bias=False),
+            nn.Conv2d(32, C, 1, 1, 0, bias=False),
             nn.GELU(),
             )
 
@@ -30,23 +30,31 @@ class Spectral_Modulate(nn.Module):
         return out
 
 class Spectral_Degradation(nn.Module):
-    def __init__(self, C, c, pos_dim=32):
+    def __init__(self, C, c, pos_dim=4):
         super().__init__()
-        mid_ch = 64
+        mid_ch = 48
         self.convs = nn.ModuleList()
         for i in range(c):
             tmp = nn.Sequential(
-                nn.Conv2d(C, mid_ch, 1, 1, 0, bias=False),
+                nn.Conv2d(C, mid_ch, 1, 1, 0),
                 nn.InstanceNorm2d(mid_ch),
                 nn.GELU(),
-                nn.Conv2d(mid_ch, mid_ch//2, 1, 1, 0, bias=False),
+                nn.Conv2d(mid_ch, mid_ch//2, 1, 1, 0),
                 nn.GELU(),
-                nn.Conv2d(mid_ch//2, 1, 1, 1, 0, bias=False),
+                nn.Conv2d(mid_ch//2, 1, 1, 1, 0),
                 nn.GELU(),
                 )
             self.convs.append(tmp)
         self.spe_modulate = Spectral_Modulate(C, pos_dim)
         self.new_bands = c
+        self.apply(self._initialize_weights)
+
+    def _initialize_weights(self, m):
+        for name, layer in self.named_modules():
+            if isinstance(layer, nn.Conv2d):
+                nn.init.orthogonal_(layer.weight)
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias, 0)
        
     def forward(self, x, pos):
         n, bands, h, w = x.shape
