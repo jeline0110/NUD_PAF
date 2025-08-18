@@ -7,6 +7,13 @@
 
 <hr />
 
+## Network Architecture
+### Non-uniform Degradation Model
+<img src="fig/NUD.png" width=600 height=375>
+
+### Position-aware Fusion Network
+<img src="fig/PAF.png" width=600 height=375>
+
 ## 1. Environment:
 
 - Python 3 (Recommend to use [Anaconda](https://www.anaconda.com/download/#linux))
