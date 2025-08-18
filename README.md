@@ -59,7 +59,8 @@ The paper has been accepted and is currently awaiting publication. If this repo 
   author={Jie Lian and Lizhi Wang and Lin Zhu and Renwei Dian and Zhiwei Xiong and Hua Huang},
   journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
   year={2025}
-}```
+}
+```
 
 ## 5. Contact:
 
