@@ -1,5 +1,5 @@
-# Building Non-uniform Degradation Model for Position-aware Hyperspectral Image Fusion (<font color="blue">Accepted by IEEE TPAMI (to appear)</font>)
-### Jie Lian[![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=WcyOmdQAAAAJ), Lizhi Wang[![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=FEprmwYAAAAJ), Lin Zhu[![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=32d6xfEAAAAJ), Renwei Dian[![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=EoTrH5UAAAAJ), Zhiwei Xiong[![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=Snl0HPEAAAAJ), Hua Huang[![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=EplUB7oAAAAJ&view_op=list_works&sortby=pubdate)
+# Building Non-uniform Degradation Model for Position-aware Hyperspectral Image Fusion (Accepted by TPAMI, to appear)
+### Jie Lian [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=WcyOmdQAAAAJ), Lizhi Wang [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=FEprmwYAAAAJ), Lin Zhu [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=32d6xfEAAAAJ), Renwei Dian [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=EoTrH5UAAAAJ), Zhiwei Xiong [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=Snl0HPEAAAAJ), Hua Huang [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=EplUB7oAAAAJ&view_op=list_works&sortby=pubdate)
 
 <hr />
 
@@ -51,8 +51,7 @@ The results will be output into `results/`.
 
 ## 4. Citation:
 
-The paper has been accepted and is currently awaiting publication.
-If this repo helps you, please consider citing our work:
+The paper has been accepted and is currently awaiting publication. If this repo helps you, please consider citing our work:
 
 ```shell
 @article{nud_paf,
