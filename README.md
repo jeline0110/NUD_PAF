@@ -9,10 +9,10 @@
 
 ## Network Architecture
 ### Non-uniform Degradation Model
-<img src="fig/NUD.png" width=900 height=475>
+<img src="fig/NUD.png" width=750 height=425>
 
 ### Position-aware Fusion Network
-<img src="fig/PAF.png" width=900 height=475>
+<img src="fig/PAF.png" width=750 height=425>
 
 ## 1. Environment:
 
