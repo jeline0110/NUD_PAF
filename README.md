@@ -1,4 +1,4 @@
-# Building Non-uniform Degradation Model for Position-aware Hyperspectral Image Fusion (Accepted by TPAMI, to appear)
+# Building Non-uniform Degradation Model for Position-aware Hyperspectral Image Fusion ([TPAMI](https://ieeexplore.ieee.org/document/11230110))
 ### Jie Lian [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=WcyOmdQAAAAJ), Lizhi Wang [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=FEprmwYAAAAJ), Lin Zhu [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=32d6xfEAAAAJ), Renwei Dian [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=EoTrH5UAAAAJ), Zhiwei Xiong [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=Snl0HPEAAAAJ), Hua Huang [![](https://img.shields.io/badge/google-scholar-yellow)](https://scholar.google.com.hk/citations?hl=zh-CN&user=EplUB7oAAAAJ&view_op=list_works&sortby=pubdate)
 
 <hr />
